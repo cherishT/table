@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Document</title>
+    <style>
+      .hide {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <table id="myTable" border="1">
+      <tr>
+        <td>cell 5</td>
+        <td>cell 2</td>
+        <td>cell 1</td>
+      </tr>
+      <tr>
+        <td rowspan="2" class="logo">cell 5</td>
+        <td>cell 1</td>
+        <td>cell 2</td>
+      </tr>
+      <tr>
+        <td>cell 3</td>
+        <td>cell 4</td>
+        <td>cell 8</td>
+      </tr>
+    </table>
+
+    <!-- https://blog.csdn.net/Abracadabra__/article/details/85264149 -->
+    <script type="text/javascript">
+      mergeRows("myTable", 0, 0, 0);
+
+      //纵向合并单元格
+      //table1:代表table的id值
+      //startRow:列的开始行
+      //endRow:列的结束行
+      //col:列号  合并相同内容的行
+      function mergeRows(table1, startRow, endRow, col) {
+        var tb = document.getElementById(table1);
+        if (col >= tb.rows[0].cells.length) {
+          return;
+        }
+        if (col == 0) {
+          endRow = tb.rows.length - 1;
+        }
+        for (var i = startRow; i < endRow; i++) {
+          // 相邻两行单元格相等
+          if (
+            tb.rows[startRow].cells[col].innerHTML ==
+            tb.rows[i + 1].cells[0].innerHTML
+          ) {
+            console.log(
+              tb.rows[i + 1].cells[0].rowSpan,
+              tb.rows[i + 1].cells[0].colSpan
+            );
+
+            // 通过添加隐藏类实现
+            tb.rows[i + 1].cells[0].setAttribute("class", "hide");
+            // 设置rowSpan
+            tb.rows[startRow].cells[col].rowSpan =
+              (tb.rows[startRow].cells[col].rowSpan | 0) + 1;
+            if (i == endRow - 1 && startRow != endRow) {
+              mergeRows(table1, startRow, endRow, col + 1);
+            }
+          } else {
+            mergeRows(table1, startRow, i + 0, col + 1);
+            startRow = i + 1;
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

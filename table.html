@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>基础表格</title>
+    <style>
+      table {
+        width: 500px;
+        margin: 30px 80px;
+      }
+      .myTable {
+        border-spacing: 0px;
+        border: 1px solid #000;
+      }
+      .myTable td {
+        width: 100px;
+        height: 50px;
+        border: 1px solid #000;
+      }
+    </style>
+  </head>
+  <body>
+    <table id="myTable" class="myTable" border="1">
+      <tr>
+        <td>cell 5</td>
+        <td>cell 2</td>
+        <td>cell 1</td>
+        <td rowspan="2">cell 1</td>
+      </tr>
+      <tr>
+        <td colspan="2">cell 3</td>
+        <td>cell 2</td>
+      </tr>
+      <tr>
+        <td colspan="4">cell 4</td>
+        <!-- <td>cell 4</td>
+        <td>cell 8</td>
+        <td>cell 8</td> -->
+      </tr>
+    </table>
+
+    <table id="myTable" class="myTable" border="1">
+      <tr>
+        <td>cell 5</td>
+        <td>cell 2</td>
+        <td rowspan="2" colspan="2">cell 1</td>
+      </tr>
+      <tr>
+        <td>cell 3</td>
+        <td>cell 2</td>
+      </tr>
+      <tr>
+        <td>cell 4</td>
+        <td>cell 4</td>
+        <td>cell 8</td>
+        <td>cell 8</td>
+      </tr>
+    </table>
+
+    <table id="myTable" class="myTable" border="1">
+        <tr>
+          <td rowspan="3">cell 5</td>
+          <td>cell 2</td>
+          <td>cell 2</td>
+        </tr>
+        <tr>
+          <td>cell 2</td>
+          <td rowspan="2">cell 2</td>
+        </tr>
+        <tr>
+          <td>cell 2</td>
+        </tr>
+      </table>
+
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script>
+      // 删除行获得点击的行
+      $(document).click(function(e) {
+        var elem = $(e.target);
+        var parent = $(e.target).parent("tr");
+        // console.log(parent);
+      });
+    </script>
+  </body>
+</html>

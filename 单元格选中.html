@@ -1,0 +1,115 @@
+<html>
+  <head>
+    <title>jquery table 选中效果</title>
+    <style>
+      .tb {
+        cellspacing: 0px;
+        border-spacing: 0px;
+        border: 1px solid #000;
+      }
+      .tb td {
+        width: 100px;
+        height: 50px;
+        border: 1px solid #000;
+      }
+      .td_bg {
+        background: #ffaa00;
+      }
+    </style>
+  </head>
+  <body>
+    <table id="tb" class="tb">
+      <tr>
+        <td>haha</td>
+        <td>haha</td>
+        <td>haha</td>
+        <td>haha</td>
+      </tr>
+      <tr>
+        <td>haha</td>
+        <td>haha</td>
+        <td>haha</td>
+        <td>haha</td>
+      </tr>
+      <tr>
+        <td>haha</td>
+        <td>haha</td>
+        <td>haha</td>
+        <td>haha</td>
+      </tr>
+      <tr>
+        <td>haha</td>
+        <td>haha</td>
+        <td>haha</td>
+        <td>haha</td>
+      </tr>
+    </table>
+
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script>
+      var mouse_begin = { x: 0, y: 0 };
+      var mouse_end = { x: 0, y: 0 };
+      $(function() {
+        init();
+        $("body").mousedown(function() {
+          $(".tb td").removeClass("td_bg"); //点击表格之外的部分，清空所有选中
+        });
+      });
+
+      function init() {
+        mouseDown();
+        mouseUp();
+      }
+      function mouseDown() {
+        $(".tb td").mousedown(function(e) {
+          e.stopPropagation(); //阻止继承父元素document的mousedown事件
+          mouse_begin = {
+            x: $(this)
+              .parent()
+              .parent()
+              .find("tr")
+              .index($(this).parent()[0]),
+            y: $(this)
+              .parent()
+              .find("td")
+              .index($(this)[0])
+          };
+          $(".tb td").removeClass("td_bg"); //清空所有选中
+          $(this).addClass("td_bg");
+          mouseMove();
+        });
+      }
+      function mouseMove() {
+        $(".tb td").mouseover(function() {
+          $(".tb td").removeClass("td_bg"); //清空所有选中
+          mouse_end = {
+            x: $(this)
+              .parent()
+              .parent()
+              .find("tr")
+              .index($(this).parent()[0]),
+            y: $(this)
+              .parent()
+              .find("td")
+              .index($(this)[0])
+          };
+          var maxX = mouse_begin.x < mouse_end.x ? mouse_end.x : mouse_begin.x;
+          var minX = mouse_begin.x < mouse_end.x ? mouse_begin.x : mouse_end.x;
+          var maxY = mouse_begin.y < mouse_end.y ? mouse_end.y : mouse_begin.y;
+          var minY = mouse_begin.y < mouse_end.y ? mouse_begin.y : mouse_end.y;
+          for (var i = minX; i <= maxX; i++) {
+            for (var j = minY; j <= maxY; j++) {
+              $(".tb tr:eq(" + i + ") td:eq(" + j + ")").addClass("td_bg");
+            }
+          }
+          //$(this).addClass('td_bg');
+        });
+      }
+      function mouseUp() {
+        $(".tb td").mouseup(function() {
+          $(".tb td").unbind("mouseover");
+        });
+      }
+    </script>
+  </body>
+</html>
