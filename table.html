@@ -22,57 +22,69 @@
     </style>
   </head>
   <body>
+    <h3>删除/插入行</h3>
+    <h4>注意：遇到 跨行 合并的单元格</h4>
     <table id="myTable" class="myTable" border="1">
       <tr>
-        <td>cell 5</td>
-        <td>cell 2</td>
-        <td>cell 1</td>
-        <td rowspan="2">cell 1</td>
+        <td rowspan="3">cell 3</td>
+        <td>cell</td>
+        <td>cell</td>
+        <td>cell</td>
+        <td rowspan="2">cell 2</td>
       </tr>
       <tr>
-        <td colspan="2">cell 3</td>
-        <td>cell 2</td>
+        <td>cell</td>
+        <td>cell</td>
+        <td>cell</td>
       </tr>
       <tr>
         <td colspan="4">cell 4</td>
-        <!-- <td>cell 4</td>
-        <td>cell 8</td>
-        <td>cell 8</td> -->
+        <!-- <td>cell</td>
+        <td>cell</td>
+        <td>cell</td> -->
       </tr>
     </table>
 
+    <h3>删除列</h3>
+    <h4>注意：遇到 跨列 合并的单元格</h4>
     <table id="myTable" class="myTable" border="1">
       <tr>
-        <td>cell 5</td>
-        <td>cell 2</td>
-        <td rowspan="2" colspan="2">cell 1</td>
+        <td>cell</td>
+        <td>cell</td>
+        <td rowspan="2" colspan="2">cell 4</td>
       </tr>
       <tr>
-        <td>cell 3</td>
-        <td>cell 2</td>
+        <td>cell</td>
+        <td>cell</td>
       </tr>
       <tr>
-        <td>cell 4</td>
-        <td>cell 4</td>
-        <td>cell 8</td>
-        <td>cell 8</td>
+        <td>cell</td>
+        <td>cell</td>
+        <td>cell</td>
+        <td>cell</td>
       </tr>
     </table>
 
+    <h3>合并拆分单元格</h3>
+    <h4>注意：遇到同时 跨行和列 的单元格</h4>
     <table id="myTable" class="myTable" border="1">
-        <tr>
-          <td rowspan="3">cell 5</td>
-          <td>cell 2</td>
-          <td>cell 2</td>
-        </tr>
-        <tr>
-          <td>cell 2</td>
-          <td rowspan="2">cell 2</td>
-        </tr>
-        <tr>
-          <td>cell 2</td>
-        </tr>
-      </table>
+      <tr>
+        <td rowspan="3">cell 3</td>
+        <td rowspan="2" colspan="2">cell 4</td>
+        <td>cell</td>
+        <td>cell</td>
+      </tr>
+      <tr>
+        <td>cell</td>
+        <td>cell</td>
+      </tr>
+      <tr>
+        <td>cell</td>
+        <td>cell</td>
+        <td>cell</td>
+        <td>cell</td>
+      </tr>
+    </table>
 
     <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
     <script>

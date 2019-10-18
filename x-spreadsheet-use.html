@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>基础表格</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/x-data-spreadsheet@1.0.13/dist/xspreadsheet.css"
+    />
+    <style>
+      .xspreadsheet {
+        margin: 30px 80px;
+      }
+      table {
+        width: 80%;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- <button id="btn_senior_edit">高级编辑</button> -->
+    <div id="xspreadsheet" class="xspreadsheet"></div>
+    <button id="btn_save_table">保存</button>
+    <div id="table_container"></div>
+
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script src="https://unpkg.com/x-data-spreadsheet@1.0.13/dist/xspreadsheet.js"></script>
+    <script src="https://unpkg.com/x-data-spreadsheet@1.0.13/dist/locale/zh-cn.js"></script>
+    <script>
+      (function() {
+        tableSeniorEdit();
+
+        $("#btn_save_table").on("click", function() {
+          saveTable();
+        });
+      })();
+
+      // 表格的最新数据
+      var latestData = {};
+
+      /* table高级编辑，包含单元格、行列操作 */
+      function tableSeniorEdit() {
+        var options = getExcelOptions();
+        var defaultData = getDataFromTable();
+        createExcel(options, defaultData);
+      }
+
+      /**TODO:从table获取数据
+       * @param {dom}   tableNode table对象
+       * @returns {Object} data数据
+       */
+      function getDataFromTable(tableNode) {
+        // 转换出merges数组
+        // 转换出rows数组
+        // 使用tr中的rowspan和colspan数值
+        return getExcelDefaultData();
+      }
+
+      /**获取excel插件的初始化数据
+       * @returns {Object} 数据
+       */
+      function getExcelDefaultData() {
+        // style：代表当前单元格的样式是styles数组中的下标
+        return {
+          name: "sheet1",
+          freeze: "A1",
+          styles: [
+            {
+              border: {
+                bottom: ["thin", "#000"],
+                top: ["thin", "#000"],
+                left: ["thin", "#000"],
+                right: ["thin", "#000"]
+              }
+            },
+            {
+              border: {
+                bottom: ["thin", "#000"],
+                top: ["thin", "#000"],
+                left: ["thin", "#000"],
+                right: ["thin", "#000"]
+              },
+              color: "#fe0000"
+            }
+          ],
+          // 合并单元格在数组中的顺序：虽然是按操作时间升序，不过怎么排序都不影响界面生成
+          merges: ["D2:D3", "A5:C5", "B2:C3", "B1:C1"],
+          rows: {
+            "0": {
+              cells: {
+                "0": { text: "1", style: 0 },
+                "1": { text: "2 B1:C1", merge: [0, 1], style: 0 },
+                "3": { text: "1", style: 0 }
+              }
+            },
+            "1": {
+              cells: {
+                "0": { text: "1", style: 0 },
+                "1": { text: "4 B2:C3", merge: [1, 1], style: 0 },
+                "3": { text: "2 D2:D3", merge: [1, 0], style: 0 }
+              }
+            },
+            "2": { cells: { "0": { text: "1", style: 0 } } },
+            "3": {
+              cells: {
+                "0": { text: "1", style: 0 },
+                "1": { text: "1", style: 0 },
+                "2": { text: "1", style: 0 },
+                "3": { text: "1", style: 0 }
+              }
+            },
+            "4": {
+              cells: {
+                "0": { text: "2 A5:C5", style: 0, merge: [0, 2] },
+                "3": { text: "1", style: 0 }
+              }
+            }
+          },
+          cols: {},
+          validations: []
+        };
+      }
+
+      /**创建excel
+       * @param {string}   options 配置选项
+       * @param {string}   defaultData 表格初始数据
+       * @returns {string[]}
+       */
+      function createExcel(options, defaultData) {
+        // 覆盖默认配置选项
+        x.spreadsheet("#xspreadsheet", options)
+          .loadData(defaultData)
+          .change(newData => {
+            latestData = newData;
+            // console.log(JSON.stringify(data));
+          });
+
+        // x.spreadsheet.locale("zh-cn");
+      }
+
+      /* 保存table */
+      function saveTable() {
+        // TODO:可能缺少判断空table的情况
+        // mock数据
+        latestData =
+          JSON.stringify(latestData) == "{}"
+            ? getExcelDefaultData()
+            : latestData;
+        console.log(latestData.rows);
+        ctTableFromData(latestData);
+      }
+
+      /**根据数据创建table节点
+       * @param {Object}   data数据
+       * @returns {dom} 表格节点
+       */
+      function ctTableFromData(data) {
+        var node;
+        var rowsData = data.rows;
+        var maxColIndex = getExcelMaxColIndex(rowsData);
+        console.log("最大列下标：" + maxColIndex);
+        var tableStr =
+          '<table border="1" width="100%" cellpadding="0" cellspacing="0"><tbody>';
+
+        for (var rowIndex in rowsData) {
+          if (rowsData.hasOwnProperty(rowIndex)) {
+            var rowCells = rowsData[rowIndex].cells;
+            // 生成一整行
+            var tableRowStr = ctTableRowStr(rowCells, maxColIndex);
+            tableStr += tableRowStr;
+          }
+        }
+        tableStr += "<tbody></table>";
+        $("#table_container").append(tableStr);
+      }
+
+      /* 生成表格的一行 */
+      function ctTableRowStr(rowCells, maxColIndex) {
+        var tableRowStr = "<tr>";
+        // 已生成的单元格数量
+        var tdCount = 0;
+        for (var cellIndex in rowCells) {
+          // 不能超过最大列号
+          if (cellIndex > maxColIndex) {
+            break;
+          }
+
+          var cell = rowCells[cellIndex];
+
+          // 判断有无单元格合并的情况
+          var rowspanStr = "";
+          var colspanStr = "";
+          if (cell.merge instanceof Array) {
+            // 因为是从0开始的，所以合并的数量要 +1
+            var rowspan = cell.merge[0] + 1;
+            var colspan = cell.merge[1] + 1;
+            if (rowspan) {
+              rowspanStr += ` rowspan=${rowspan}`;
+            }
+            if (colspan) {
+              colspanStr += ` colspan=${colspan}`;
+            }
+          }
+
+          if (colspan) {
+            tdCount += colspan;
+          } else {
+            tdCount++;
+          }
+
+          // 生成td
+          tableRowStr += `<td${rowspanStr}${colspanStr}>${cell.text}</td>`;
+        }
+
+        // 单元格不够的话，补齐
+        if (tdCount < maxColIndex + 1) {
+          for (var i = 0; i < maxColIndex + 1 - tdCount; i++) {
+            tableRowStr += `<td></td>`;
+          }
+        }
+
+        return tableRowStr;
+      }
+
+      /**获取excel的列数
+       * @param {dom}   tableNode table对象
+       * @returns {Number}
+       */
+      function getExcelMaxColIndex(excelRows) {
+        var maxColIndex = 0;
+
+        // TODO:可能空行缺少判断
+        // TODO:只要编辑的单元格，即使没有值，也会占一个空的位置，因此会生成很多空列？？？
+        // 取得每行cells的最后（也是最大）key值
+        for (var rowIndex in excelRows) {
+          if (excelRows.hasOwnProperty(rowIndex)) {
+            var cells = excelRows[rowIndex].cells;
+            var keys = Object.keys(cells);
+            var lastRowIndex = parseInt(keys[keys.length - 1]);
+            var cell = cells[lastRowIndex];
+            // 防止用户编辑过的单元格，内容删掉了，但是cell={}/{text:""}，生成不必要的列
+            if (cell.text && lastRowIndex > maxColIndex) {
+              // 如果该单元格有合并列的情况，要加上colspan
+              var colspan = 0;
+              var mergeArr = cell.merge;
+              if (mergeArr instanceof Array) {
+                colspan = mergeArr[1];
+              }
+
+              maxColIndex = lastRowIndex + colspan;
+            }
+          }
+        }
+        return maxColIndex;
+      }
+
+      /**获取excel插件的配置选项
+       * @returns {Object} 数据
+       */
+      function getExcelOptions() {
+        return {
+          showToolbar: true,
+          showContextmenu: true,
+          view: {
+            height: () => 300,
+            width: () => 800
+          },
+          row: {
+            len: 100,
+            height: 25
+          },
+          col: {
+            len: 26,
+            width: 100,
+            indexWidth: 60,
+            minWidth: 60
+          },
+          style: {
+            bgcolor: "#ffffff",
+            align: "left",
+            valign: "middle",
+            textwrap: false,
+            strike: false,
+            underline: false,
+            color: "#0a0a0a",
+            font: {
+              name: "Helvetica",
+              size: 10,
+              bold: false,
+              italic: false
+            }
+          }
+        };
+      }
+    </script>
+  </body>
+</html>
