@@ -72,14 +72,6 @@
                 top: ["thin", "#000"],
                 left: ["thin", "#000"],
                 right: ["thin", "#000"]
-              }
-            },
-            {
-              border: {
-                bottom: ["thin", "#000"],
-                top: ["thin", "#000"],
-                left: ["thin", "#000"],
-                right: ["thin", "#000"]
               },
               color: "#fe0000"
             }
@@ -89,31 +81,31 @@
           rows: {
             "0": {
               cells: {
-                "0": { text: "1", style: 0 },
-                "1": { text: "2 B1:C1", merge: [0, 1], style: 0 },
-                "3": { text: "1", style: 0 }
+                "0": { text: "1" },
+                "1": { text: "2 B1:C1", merge: [0, 1] },
+                "3": { text: "1" }
               }
             },
             "1": {
               cells: {
-                "0": { text: "1", style: 0 },
-                "1": { text: "4 B2:C3", merge: [1, 1], style: 0 },
-                "3": { text: "2 D2:D3", merge: [1, 0], style: 0 }
+                "0": { text: "1" },
+                "1": { text: "4 B2:C3", merge: [1, 1] },
+                "3": { text: "2 D2:D3", merge: [1, 0] }
               }
             },
-            "2": { cells: { "0": { text: "1", style: 0 } } },
+            "2": { cells: { "0": { text: "1" } } },
             "3": {
               cells: {
-                "0": { text: "1", style: 0 },
-                "1": { text: "1", style: 0 },
-                "2": { text: "1", style: 0 },
-                "3": { text: "1", style: 0 }
+                "0": { text: "1" },
+                "1": { text: "1" },
+                "2": { text: "1" },
+                "3": { text: "1" }
               }
             },
             "4": {
               cells: {
-                "0": { text: "2 A5:C5", style: 0, merge: [0, 2] },
-                "3": { text: "1", style: 0 }
+                "0": { text: "2 A5:C5", merge: [0, 2] },
+                "3": { text: "1" }
               }
             }
           },
@@ -133,20 +125,26 @@
           .loadData(defaultData)
           .change(newData => {
             latestData = newData;
-            // console.log(JSON.stringify(data));
           });
 
         // x.spreadsheet.locale("zh-cn");
+      }
+
+      function isObjEmpty(obj) {
+        return JSON.stringify(obj) == "{}";
+      }
+
+      function isArrEmpty(arr) {
+        return arr.length == 0;
       }
 
       /* 保存table */
       function saveTable() {
         // TODO:可能缺少判断空table的情况
         // mock数据
-        latestData =
-          JSON.stringify(latestData) == "{}"
-            ? getExcelDefaultData()
-            : latestData;
+        latestData = isObjEmpty(latestData)
+          ? getExcelDefaultData()
+          : latestData;
         console.log(latestData.rows);
         ctTableFromData(latestData);
       }
@@ -166,6 +164,8 @@
         for (var rowIndex in rowsData) {
           if (rowsData.hasOwnProperty(rowIndex)) {
             var rowCells = rowsData[rowIndex].cells;
+            // 如果是空cells，说明可能是上一行有rowspan属性，跳过
+            if (isObjEmpty(rowCells)) continue;
             // 生成一整行
             var tableRowStr = ctTableRowStr(rowCells, maxColIndex);
             tableStr += tableRowStr;
@@ -191,10 +191,12 @@
           // 判断有无单元格合并的情况
           var rowspanStr = "";
           var colspanStr = "";
+          var rowspan = 1;
+          var colspan = 1;
           if (cell.merge instanceof Array) {
             // 因为是从0开始的，所以合并的数量要 +1
-            var rowspan = cell.merge[0] + 1;
-            var colspan = cell.merge[1] + 1;
+            rowspan = cell.merge[0] + 1;
+            colspan = cell.merge[1] + 1;
             if (rowspan) {
               rowspanStr += ` rowspan=${rowspan}`;
             }
@@ -203,14 +205,10 @@
             }
           }
 
-          if (colspan) {
-            tdCount += colspan;
-          } else {
-            tdCount++;
-          }
+          tdCount += colspan;
 
           // 生成td
-          tableRowStr += `<td${rowspanStr}${colspanStr}>${cell.text}</td>`;
+          tableRowStr += `<td${rowspanStr}${colspanStr}>${cell.text||" "}</td>`;
         }
 
         // 单元格不够的话，补齐
@@ -237,6 +235,8 @@
           if (excelRows.hasOwnProperty(rowIndex)) {
             var cells = excelRows[rowIndex].cells;
             var keys = Object.keys(cells);
+            // 如果是空cells，说明可能是上一行有rowspan属性
+            if (isArrEmpty(keys)) continue;
             var lastRowIndex = parseInt(keys[keys.length - 1]);
             var cell = cells[lastRowIndex];
             // 防止用户编辑过的单元格，内容删掉了，但是cell={}/{text:""}，生成不必要的列
