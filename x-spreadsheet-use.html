@@ -29,7 +29,7 @@
     <script src="https://unpkg.com/x-data-spreadsheet@1.0.13/dist/locale/zh-cn.js"></script>
     <script>
       (function() {
-        tableSeniorEdit();
+        init();
 
         $("#btn_save_table").on("click", function() {
           saveTable();
@@ -39,21 +39,36 @@
       // 表格的最新数据
       var latestData = {};
 
-      /* table高级编辑，包含单元格、行列操作 */
-      function tableSeniorEdit() {
+      /* 初始化，用table生成excel */
+      function init() {
         var options = getExcelOptions();
         var defaultData = getDataFromTable();
         createExcel(options, defaultData);
       }
 
-      /**TODO:从table获取数据
+      /**创建excel
+       * @param {string}   options 配置选项
+       * @param {string}   defaultData 表格初始数据
+       * @returns {string[]}
+       */
+      function createExcel(options, defaultData) {
+        // 覆盖默认配置选项
+        // x.spreadsheet.locale("zh-cn");
+        var excel = x.spreadsheet("#xspreadsheet", options);
+        excel.loadData(defaultData).change(newData => {
+          latestData = newData;
+          // console.log(JSON.stringify(newData));
+          console.log(newData);
+        });
+
+        // excel.locale("zh-cn");
+      }
+
+      /**TODO:从table获取excel数据
        * @param {dom}   tableNode table对象
        * @returns {Object} data数据
        */
       function getDataFromTable(tableNode) {
-        // 转换出merges数组
-        // 转换出rows数组
-        // 使用tr中的rowspan和colspan数值
         return getExcelDefaultData();
       }
 
@@ -65,35 +80,34 @@
         return {
           name: "sheet1",
           freeze: "A1",
-          styles: [
-            {
-              border: {
-                bottom: ["thin", "#000"],
-                top: ["thin", "#000"],
-                left: ["thin", "#000"],
-                right: ["thin", "#000"]
-              },
-              color: "#fe0000"
-            }
-          ],
-          // 合并单元格在数组中的顺序：虽然是按操作时间升序，不过怎么排序都不影响界面生成
-          merges: ["D2:D3", "A5:C5", "B2:C3", "B1:C1"],
+          styles: [],
+          merges: ["A1:A3", "B2:B3", "C1:D1"],
           rows: {
+            // 行index计算方式：向上找
+
             "0": {
               cells: {
-                "0": { text: "1" },
-                "1": { text: "2 B1:C1", merge: [0, 1] },
-                "3": { text: "1" }
+                "0": { text: "1", merge: [2, 0] },
+                "1": { text: "1" },
+                "2": { text: "1", merge: [0, 1] },
+                "4": { text: "1" }
               }
             },
             "1": {
               cells: {
-                "0": { text: "1" },
-                "1": { text: "4 B2:C3", merge: [1, 1] },
-                "3": { text: "2 D2:D3", merge: [1, 0] }
+                "1": { text: "1", merge: [1, 0] },
+                "2": { text: "1" },
+                "3": { text: "1" },
+                "4": { text: "1" }
               }
             },
-            "2": { cells: { "0": { text: "1" } } },
+            "2": {
+              cells: {
+                "2": { text: "1" },
+                "3": { text: "1" },
+                "4": { text: "1" }
+              }
+            },
             "3": {
               cells: {
                 "0": { text: "1" },
@@ -101,41 +115,83 @@
                 "2": { text: "1" },
                 "3": { text: "1" }
               }
-            },
-            "4": {
-              cells: {
-                "0": { text: "2 A5:C5", merge: [0, 2] },
-                "3": { text: "1" }
-              }
             }
           },
           cols: {},
           validations: []
         };
+        //   return {
+        //     name: "sheet1",
+        //     freeze: "A1",
+        //     styles: [],
+        //     merges: ["A1:A3", "B2:B3", "C1:D1"],
+        //     rows: {
+        //       "0": {
+        //         cells: {
+        //           "0": { text: "1", merge: [2, 0] },
+        //           "1": { text: "1" },
+        //           "2": { text: "1", merge: [0, 1] }
+        //         }
+        //       },
+        //       "1": {
+        //         cells: {
+        //           "1": { text: "1", merge: [1, 0] },
+        //           "2": { text: "1" },
+        //           "3": { text: "1" }
+        //         }
+        //       },
+        //       "2": { cells: { "2": { text: "1" }, "3": { text: "1" } } },
+        //       "3": {
+        //         cells: {
+        //           "0": { text: "1" },
+        //           "1": { text: "1" },
+        //           "2": { text: "1" },
+        //           "3": { text: "1" }
+        //         }
+        //       }
+        //     },
+        //     cols: {},
+        //     validations: []
+        //   };
       }
 
-      /**创建excel
-       * @param {string}   options 配置选项
-       * @param {string}   defaultData 表格初始数据
-       * @returns {string[]}
+      /**获取excel插件的配置选项
+       * @returns {Object} 数据
        */
-      function createExcel(options, defaultData) {
-        // 覆盖默认配置选项
-        x.spreadsheet("#xspreadsheet", options)
-          .loadData(defaultData)
-          .change(newData => {
-            latestData = newData;
-          });
-
-        // x.spreadsheet.locale("zh-cn");
-      }
-
-      function isObjEmpty(obj) {
-        return JSON.stringify(obj) == "{}";
-      }
-
-      function isArrEmpty(arr) {
-        return arr.length == 0;
+      function getExcelOptions() {
+        return {
+          showToolbar: true,
+          showContextmenu: true,
+          view: {
+            height: () => 300,
+            width: () => 800
+          },
+          row: {
+            len: 100,
+            height: 25
+          },
+          col: {
+            len: 26,
+            width: 100,
+            indexWidth: 60,
+            minWidth: 60
+          },
+          style: {
+            bgcolor: "#ffffff",
+            align: "left",
+            valign: "middle",
+            textwrap: false,
+            strike: false,
+            underline: false,
+            color: "#0a0a0a",
+            font: {
+              name: "Helvetica",
+              size: 10,
+              bold: false,
+              italic: false
+            }
+          }
+        };
       }
 
       /* 保存table */
@@ -145,7 +201,6 @@
         latestData = isObjEmpty(latestData)
           ? getExcelDefaultData()
           : latestData;
-        console.log(latestData.rows);
         ctTableFromData(latestData);
       }
 
@@ -194,7 +249,7 @@
           var rowspan = 1;
           var colspan = 1;
           if (cell.merge instanceof Array) {
-            // 因为是从0开始的，所以合并的数量要 +1
+            // 因为跨格数是从0开始算起的，所以合并的格数要 +1
             rowspan = cell.merge[0] + 1;
             colspan = cell.merge[1] + 1;
             if (rowspan) {
@@ -208,15 +263,16 @@
           tdCount += colspan;
 
           // 生成td
-          tableRowStr += `<td${rowspanStr}${colspanStr}>${cell.text||" "}</td>`;
+          tableRowStr += `<td${rowspanStr}${colspanStr}>${cell.text ||
+            " "}</td>`;
         }
 
         // 单元格不够的话，补齐
-        if (tdCount < maxColIndex + 1) {
-          for (var i = 0; i < maxColIndex + 1 - tdCount; i++) {
-            tableRowStr += `<td></td>`;
-          }
-        }
+        // if (tdCount < maxColIndex + 1) {
+        //   for (var i = 0; i < maxColIndex + 1 - tdCount; i++) {
+        //     tableRowStr += `<td></td>`;
+        //   }
+        // }
 
         return tableRowStr;
       }
@@ -255,43 +311,12 @@
         return maxColIndex;
       }
 
-      /**获取excel插件的配置选项
-       * @returns {Object} 数据
-       */
-      function getExcelOptions() {
-        return {
-          showToolbar: true,
-          showContextmenu: true,
-          view: {
-            height: () => 300,
-            width: () => 800
-          },
-          row: {
-            len: 100,
-            height: 25
-          },
-          col: {
-            len: 26,
-            width: 100,
-            indexWidth: 60,
-            minWidth: 60
-          },
-          style: {
-            bgcolor: "#ffffff",
-            align: "left",
-            valign: "middle",
-            textwrap: false,
-            strike: false,
-            underline: false,
-            color: "#0a0a0a",
-            font: {
-              name: "Helvetica",
-              size: 10,
-              bold: false,
-              italic: false
-            }
-          }
-        };
+      function isObjEmpty(obj) {
+        return JSON.stringify(obj) == "{}";
+      }
+
+      function isArrEmpty(arr) {
+        return arr.length == 0;
       }
     </script>
   </body>

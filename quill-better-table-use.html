@@ -1,0 +1,33 @@
+<html>
+  <head>
+    <title>标题</title>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/quill/2.0.0-dev.3/quill.snow.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="unpkg.com/quill-better-table@1.1.9/dist/quill-better-table.css"
+      rel="stylesheet"
+    />
+    <style></style>
+  </head>
+  <body>
+    <div class="demo">
+      <div class="btn-group">
+        <button id="insert-table">插入表格</button>
+        <button id="get-table">获取表格</button>
+        <button id="get-contents">获取内容</button>
+      </div>
+      <div id="editor"></div>
+      <!--  delta  -->
+      <h3>Delta formats</h3>
+      <p id="delta-view"></p>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/quill/2.0.0-dev.3/quill.min.js"
+      type="text/javascript"
+    ></script>
+    <script type="module" src="quill-better-table-use.js"></script>
+  </body>
+</html>
