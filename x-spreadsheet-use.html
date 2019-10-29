@@ -38,16 +38,6 @@
         <td colspan="4">cell 4</td>
       </tr>
     </table> -->
-    <table border="1">
-      <tr>
-        <td>111</td>
-        <td>222</td>
-        <td>333</td>
-      </tr>
-      <tr>
-        <td>aaa</td>
-      </tr>
-    </table>
 
     <div id="xspreadsheet" class="xspreadsheet"></div>
     <button id="btn_save_table">保存</button>
@@ -422,38 +412,34 @@
        */
       function ctTableFromData(data) {
         var node;
-        var rowsData = data.rows;
-        maxColIdx = getExcelMaxColIdx(rowsData);
+        var rows = data.rows;
+        maxColIdx = getExcelMaxColIdx(rows);
         console.log("最大列下标：" + maxColIdx);
 
         var tableStr =
           '<table border="1" width="100%" cellpadding="0" cellspacing="0"><tbody>';
 
-        for (var rIdx in rowsData) {
-          if (rowsData.hasOwnProperty(rIdx)) {
-            var rowCells = rowsData[rIdx].cells;
-            // 如果是空cells，说明可能是上一行有rowspan属性，跳过
-            if (isObjEmpty(rowCells)) continue;
-            // 生成一整行
-            var tableRowStr = ctTableRowStr(rIdx, rowCells);
-            tableStr += tableRowStr;
-          }
+        for (var rIdx in rows) {
+          var cells = rows[rIdx].cells;
+          // 如果是空cells，说明可能是上一行有rowspan属性，跳过
+          if (isObjEmpty(cells)) continue;
+          // 生成一整行
+          var tableRowStr = ctTableRowStr(rIdx, cells);
+          tableStr += tableRowStr;
         }
         tableStr += "<tbody></table>";
         $("#table_container").html(tableStr);
       }
 
       /* 生成表格的一行 */
-      function ctTableRowStr(rIdx, rowCells) {
+      function ctTableRowStr(rIdx, cells) {
         var tableRowStr = "<tr>";
 
-        // 已生成的单元格数量
-        var tdCount = 0;
-        for (var cellIdx in rowCells) {
+        for (var cIdx in cells) {
           // 不能超过最大列号
-          if (cellIdx > maxColIdx) break;
+          if (cIdx > maxColIdx) break;
 
-          var cell = rowCells[cellIdx];
+          var cell = cells[cIdx];
 
           // 判断有无单元格合并的情况
           var rowspanStr = "";
@@ -470,12 +456,10 @@
 
           tableRowStr += `<td${rowspanStr}${colspanStr}>${cell.text ||
             " "}</td>`;
-          // 记录当前行中，单元格个数=最大下标的单元格的下标+该单元格的colspan
-          tdCount = +cellIdx + colspan;
         }
 
         // 单元格补齐
-        var missTdCount = getRowMissTdCount(rIdx, tdCount);
+        var missTdCount = getRowMissTdCount(rIdx, cells);
         for (var i = 0; i < missTdCount; i++) {
           tableRowStr += `<td>&nbsp;</td>`;
         }
@@ -485,20 +469,30 @@
       }
 
       /**计算某行缺少的单元格个数
-       * @param {Number}   targetRowIdx
-       * @param {Number}  tdCount
+       * @param {Number}   targetRowIdx 目标行下标
+       * @param {map}  cells 目标行单元格数据
        */
-      function getRowMissTdCount(targetRowIdx, tdCount) {
-        console.log("单元格补齐");
+      function getRowMissTdCount(targetRowIdx, cells) {
+        // 记录缺失的单元格数量
         var count = 0;
+
+        // 记录当前行已有的单元格数量
+        var keys = Object.keys(cells);
+
+        // 不缺单元格
+        if (isArrEmpty(keys)) return count;
+
+        var rowLastCellIdx = keys[keys.length - 1];
+        var cell = cells[rowLastCellIdx];
+        var tdCount = +rowLastCellIdx + (cell.merge ? cell.merge[1] + 1 : 1);
+
         var rows = latestData.rows;
 
         // 从第一行向当前行，寻找影响当前行单元格个数的cell
         for (var rIdx in rows) {
-          var cells = rows[rIdx].cells;
-
           if (rIdx >= targetRowIdx) break;
 
+          var cells = rows[rIdx].cells;
           for (var cIdx in cells) {
             var cell = cells[cIdx];
 
@@ -508,17 +502,17 @@
               rowspan += cell.merge[0];
               colspan += cell.merge[1];
             }
-            // 通过rowspan判断它的作用范围是否包含了当前行
+            // 通过rowspan计算单元格的作用范围
             var rowRange = +rIdx + rowspan;
 
-            // 如果在作用范围内
-            if (targetRowIdx < rowRange) {
+            // 如果在作用范围内，且单元格下标>当前行最后一个单元格的下标
+            if (targetRowIdx < rowRange && rowLastCellIdx < cIdx) {
               tdCount += colspan;
             }
           }
         }
         count = maxColIdx + 1 - tdCount;
-        console.log("targetRowIdx: " + targetRowIdx, "count: " + count);
+        // console.log("targetRowIdx: " + targetRowIdx, "count: " + count);
         return count;
       }
 
@@ -526,19 +520,19 @@
        * @param {dom}   tableNode table对象
        * @returns {Number}
        */
-      function getExcelMaxColIdx(excelRows) {
+      function getExcelMaxColIdx(rows) {
         var maxColIdx = 0;
 
         // TODO:可能空行缺少判断
         // TODO:只要编辑的单元格，即使没有值，也会占一个空的位置，因此会生成很多空列？？？
         // 取得每行cells的最后（也是最大）key值
-        for (var rIdx in excelRows) {
-          if (excelRows.hasOwnProperty(rIdx)) {
-            var cells = excelRows[rIdx].cells;
+        for (var rIdx in rows) {
+          if (rows.hasOwnProperty(rIdx)) {
+            var cells = rows[rIdx].cells;
             var keys = Object.keys(cells);
             // 如果是空cells，说明可能是上一行有rowspan属性
             if (isArrEmpty(keys)) continue;
-            var lastRowIdx = parseInt(keys[keys.length - 1]);
+            var lastRowIdx = keys[keys.length - 1];
             var cell = cells[lastRowIdx];
             // 防止用户编辑过的单元格，内容删掉了，但是cell={}/{text:""}，生成不必要的列
             if (cell.text && lastRowIdx > maxColIdx) {
@@ -549,7 +543,7 @@
                 colspan = mergeArr[1];
               }
 
-              maxColIdx = lastRowIdx + colspan;
+              maxColIdx = parseInt(lastRowIdx) + colspan;
             }
           }
         }
