@@ -39,6 +39,60 @@
       </tr>
     </table> -->
 
+    <table
+      id="targetTable"
+      border="1"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+    >
+      <tbody>
+        <tr>
+          <td colspan="2">单位名称</td>
+          <td colspan="4">xxx发电厂</td>
+        </tr>
+        <tr>
+          <td rowspan="3">本账簿</td>
+          <td rowspan="2">名册</td>
+          <td>A名册</td>
+          <td colspan="2">xxx</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>B名册</td>
+          <td colspan="2">xxx</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>页数</td>
+          <td colspan="3">3</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td colspan="2">单位负责</td>
+          <td colspan="2">主管会计</td>
+          <td rowspan="3">记账h</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>姓名</td>
+          <td>盖章</td>
+          <td>姓名</td>
+          <td>盖章</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>xxx</td>
+          <td>xxx</td>
+          <td>xxx</td>
+          <td>xxx</td>
+          <td></td>
+        </tr>
+      </tbody>
+      <tbody></tbody>
+    </table>
+    <button id="btn_to_json">导入到excel</button>
+
     <div id="xspreadsheet" class="xspreadsheet"></div>
     <button id="btn_save_table">保存</button>
     <div id="table_container"></div>
@@ -48,6 +102,10 @@
     <script>
       (function() {
         init();
+
+        $("#btn_to_json").on("click", function() {
+          getDataFromTable("#targetTable");
+        });
 
         $("#btn_save_table").on("click", function() {
           saveTable();
@@ -63,8 +121,8 @@
       /* 初始化，用table生成excel */
       function init() {
         var options = getExcelOptions();
-        var defaultData = getDataFromTable("");
-        createExcel(options, defaultData);
+        var data = getDataFromTable("#targetTable");
+        createExcel(options, data);
       }
 
       /**创建excel
@@ -86,13 +144,45 @@
       }
 
       /**TODO:从table获取excel数据
-       * @param {dom}   tableNode table对象
+       * @param {dom}  tableNode table对象
        * @returns {Object} data数据
        */
-      function getDataFromTable(tableNode) {
+      function getDataFromTable(tableSelector) {
+        if (!tableSelector) return {};
         // rowsCount: 遍历到当前行，累积的总行数
         // rIdx（行下标）
         // 从0开始
+        var jsonData = {};
+        var rows = {};
+        // TODO:计算merges数组
+        var merges = [];
+        var trs = $(tableSelector).find("tr");
+        for (let i = 0; i < trs.length; i++) {
+          rows[i] = { cells: {} };
+
+          const tds = $(trs[i]).find("td");
+          var nextCellIdx = 0;
+          // TODO:计算nextCellIdx
+          for (let j = 0; j < tds.length; j++) {
+            var cell = {};
+            var td = $(tds[j]);
+            cell.text = td.html() || " ";
+            var rowspan = td.attr("rowspan") || 1;
+            var colspan = td.attr("colspan") || 1;
+
+            if (rowspan > 1 || colspan > 1) {
+              cell.merge = [rowspan - 1, colspan - 1];
+            }
+
+            rows[i].cells[nextCellIdx] = cell;
+            nextCellIdx = +colspan + nextCellIdx;
+          }
+          console.log(i + " : ");
+          console.log(rows[i].cells);
+        }
+        jsonData.rows = rows;
+        return jsonData;
+
         // 计算方式：通过rowsCount得出当前是否是
         return getExcelDefaultData4();
       }
@@ -461,7 +551,7 @@
         // 单元格补齐
         var missTdCount = getRowMissTdCount(rIdx, cells);
         for (var i = 0; i < missTdCount; i++) {
-          tableRowStr += `<td>&nbsp;</td>`;
+          tableRowStr += `<td> </td>`;
         }
 
         tableRowStr += "</tr>";
