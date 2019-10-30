@@ -56,37 +56,37 @@
           <td rowspan="2">名册</td>
           <td>A名册</td>
           <td colspan="2">xxx</td>
-          <td></td>
+          <td>就</td>
         </tr>
         <tr>
           <td>B名册</td>
           <td colspan="2">xxx</td>
-          <td></td>
+          <td>就</td>
         </tr>
         <tr>
           <td>页数</td>
           <td colspan="3">3</td>
-          <td></td>
+          <td>就</td>
         </tr>
         <tr>
           <td colspan="2">单位负责</td>
           <td colspan="2">主管会计</td>
           <td rowspan="3">记账h</td>
-          <td></td>
+          <td>就</td>
         </tr>
         <tr>
           <td>姓名</td>
           <td>盖章</td>
           <td>姓名</td>
           <td>盖章</td>
-          <td></td>
+          <td>就</td>
         </tr>
         <tr>
           <td>xxx</td>
           <td>xxx</td>
           <td>xxx</td>
           <td>xxx</td>
-          <td></td>
+          <td>就</td>
         </tr>
       </tbody>
       <tbody></tbody>
@@ -100,6 +100,12 @@
     <script src="https://unpkg.com/x-data-spreadsheet@1.0.13/dist/xspreadsheet.js"></script>
     <script src="https://unpkg.com/x-data-spreadsheet@1.0.13/dist/locale/zh-cn.js"></script>
     <script>
+      var charStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      // 表格的最新数据
+      var latestData = {};
+
+      // 表格最大列的下标
+      var maxColIdx = 0;
       (function() {
         init();
 
@@ -111,12 +117,6 @@
           saveTable();
         });
       })();
-
-      // 表格的最新数据
-      var latestData = {};
-
-      // 表格最大列的下标
-      var maxColIdx = 0;
 
       /* 初始化，用table生成excel */
       function init() {
@@ -149,48 +149,110 @@
        */
       function getDataFromTable(tableSelector) {
         if (!tableSelector) return {};
-        // rowsCount: 遍历到当前行，累积的总行数
-        // rIdx（行下标）
-        // 从0开始
-        var jsonData = {};
-        var rows = {};
-        // TODO:计算merges数组
+
+        // excel插件要求的数据
+        var jsonData = { merges: [], rows: {} };
+
         var merges = [];
+        var rows = {};
+
         var trs = $(tableSelector).find("tr");
-        for (let i = 0; i < trs.length; i++) {
+        for (var i = 0; i < trs.length; i++) {
           rows[i] = { cells: {} };
 
           const tds = $(trs[i]).find("td");
-          var nextCellIdx = 0;
-          // TODO:计算nextCellIdx
-          for (let j = 0; j < tds.length; j++) {
-            var cell = {};
+
+          // 当前行，当前单元格的前一个单元格的下标
+          var prevCellIdx = 0;
+          // 当前行，当前单元格的下标
+          var currCellIdx = 0;
+          for (var j = 0; j < tds.length; j++) {
+            // 计算当前行前面的行中，影响当前单元格的 单元格 的cellIdx+colspan
+            // 确定查找范围
+            currCellIdx = getCellIdx(rows, i, prevCellIdx);
+
             var td = $(tds[j]);
+            var cell = {};
+
             cell.text = td.html() || " ";
             var rowspan = td.attr("rowspan") || 1;
             var colspan = td.attr("colspan") || 1;
-
             if (rowspan > 1 || colspan > 1) {
               cell.merge = [rowspan - 1, colspan - 1];
+              // 将当前单元格的merge情况放到merges数组中
+              var startChar = charStr.charAt(currCellIdx);
+              var endChar = charStr.charAt(currCellIdx + +colspan - 1);
+              var startNum = i + 1;
+              var endNum = i + 1 + +rowspan - 1;
+              merges.push(startChar + startNum + ":" + endChar + endNum);
             }
 
-            rows[i].cells[nextCellIdx] = cell;
-            nextCellIdx = +colspan + nextCellIdx;
+            rows[i].cells[currCellIdx] = cell;
+
+            prevCellIdx = +colspan + currCellIdx;
           }
-          console.log(i + " : ");
-          console.log(rows[i].cells);
         }
+
         jsonData.rows = rows;
+        jsonData.merges = merges;
         return jsonData;
 
-        // 计算方式：通过rowsCount得出当前是否是
-        return getExcelDefaultData4();
+        // return getExcelDefaultData4();
+      }
+
+      /**获取单元格的index
+       *
+       */
+      function getCellIdx(rows, targetRowIdx, startCellIdx) {
+        var _cIdx = startCellIdx;
+
+        // 第一行每个单元格
+        if (targetRowIdx == 0) return _cIdx;
+
+        row_loop: for (var rIdx in rows) {
+          // 如果当前循环的行超出范围
+          if (rIdx >= targetRowIdx) break;
+
+          // 否则，查找某行中影响当前单元格下标的单元格
+          var cells = rows[rIdx].cells;
+          for (var cIdx in cells) {
+            // 跳过前面已经查找过的单元格
+            if (cIdx < startCellIdx) continue;
+            // 如果已经超过当前下标了,而且不是第一个，则不必往后找了
+            if (cIdx > startCellIdx && startCellIdx > 0) break;
+
+            var cell = cells[cIdx];
+            var rowspan = 1;
+            var colspan = 1;
+            if (cell.merge instanceof Array) {
+              rowspan += cell.merge[0];
+              colspan += cell.merge[1];
+            }
+
+            // 单元格的作用范围
+            var rowRange = +rIdx + rowspan;
+
+            // 如果第一个匹配的单元格的作用范围包含目标行
+            if (rowRange > targetRowIdx) {
+              // 继续往后继的单元格找
+              _cIdx = +colspan + +cIdx;
+              continue;
+            }
+
+            // 否则，不包含的话
+            //  如果已经是当前行的上一行了，就不必再找后面的了
+            if (rIdx == targetRowIdx - 1) break row_loop;
+            //  否则，继续往下一行同一位置开始找
+            startCellIdx = cIdx;
+            break;
+          }
+        }
+        return _cIdx;
       }
 
       /**获取excel插件的初始化数据
        * @returns {Object} 数据
        */
-
       function getExcelDefaultData4() {
         return {
           name: "sheet1",
@@ -365,7 +427,6 @@
           validations: []
         };
       }
-
       function getExcelDefaultData2() {
         return {
           name: "sheet1",
@@ -410,7 +471,6 @@
           validations: []
         };
       }
-
       function getExcelDefaultData1() {
         return {
           name: "sheet1",
@@ -602,7 +662,6 @@
           }
         }
         count = maxColIdx + 1 - tdCount;
-        // console.log("targetRowIdx: " + targetRowIdx, "count: " + count);
         return count;
       }
 
