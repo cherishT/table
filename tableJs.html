@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+</head>
+<body>
+  <script>
+  var TableApi;  
+(function () {  
+    var MyDom = Helper.Dom;  
+    var MyCore = Helper.Core;  
+  
+    TableApi = {  
+        /** 
+         * 获取table元素的单元格分布矩阵 
+         * @param table 
+         */  
+        getMatrix : function (table) {  
+            var matrix = [];  
+            for (var rowIndex = 0, rCnt = table.rows.length; rowIndex < rCnt; rowIndex++) {  
+                if (!matrix[rowIndex]) {  
+                    matrix[rowIndex] = [];  
+                }  
+                for (var cellIndex = 0, cCnt = table.rows[rowIndex].cells.length; cellIndex < cCnt; cellIndex++) {  
+                    var columnIndex = cellIndex;  
+                //In case there's are any horizontal or vertical spans before this cell  
+                    while (matrix[rowIndex][columnIndex]) {  
+                        columnIndex++;  
+                    }  
+  
+                    var cell = table.rows[rowIndex].cells[cellIndex];  
+  
+                //Fill the corresponding matrix points  
+                    for (var i = 0; i < cell.rowSpan; i++) {  
+                        if (!matrix[rowIndex + i]) {  
+                            matrix[rowIndex + i] = [];  
+                        }  
+                        for (var j = 0; j < cell.colSpan; j++) {  
+                            matrix[rowIndex + i][columnIndex + j] = cell;  
+                        }  
+                    }  
+                }  
+            }  
+            return matrix;  
+        },  
+        /** 
+         * 合并单元格分布矩阵中选中的单元格 
+         * @param matrix 
+         */  
+        merge : function (matrix) {  
+            var maxRowIndex = 0;  
+            var minRowIndex = matrix.length - 1;  
+            var maxColumnIndex = 0;  
+            var minColumnIndex = matrix[0].length - 1;  
+  
+            var rowIndex, columnIndex, rCnt, cCnt;  
+  
+        //decide if selected cells region is mergable  
+            for (rowIndex = 0,rCnt = matrix.length; rowIndex < rCnt; rowIndex++) {  
+                for (columnIndex = 0,cCnt = matrix[0].length; columnIndex < cCnt; columnIndex++) {  
+                    if ($(matrix[rowIndex][columnIndex]).hasClass('selected')) {  
+                        if (rowIndex > maxRowIndex) {  
+                            maxRowIndex = rowIndex;  
+                        }  
+                        if (rowIndex < minRowIndex) {  
+                            minRowIndex = rowIndex;  
+                        }  
+                        if (columnIndex > maxColumnIndex) {  
+                            maxColumnIndex = columnIndex;  
+                        }  
+                        if (columnIndex < minColumnIndex) {  
+                            minColumnIndex = columnIndex;  
+                        }  
+                    }  
+                }  
+            }  
+  
+            var mergable = true;  
+            for (rowIndex = minRowIndex; rowIndex <= maxRowIndex && mergable; rowIndex++) {  
+                for (columnIndex = minColumnIndex; columnIndex <= maxColumnIndex; columnIndex++) {  
+                    if (!$(matrix[rowIndex][columnIndex]).hasClass('selected')) {  
+                        mergable = false;  
+                        break;  
+                    }  
+                }  
+            }  
+  
+            if (mergable) {  
+                //then merge  
+                var cellToMergeInto = matrix[minRowIndex][minColumnIndex];  
+                for (rowIndex = minRowIndex; rowIndex <= maxRowIndex; rowIndex++) {  
+                    for (columnIndex = minColumnIndex; columnIndex <= maxColumnIndex; columnIndex++) {  
+                        var cell = matrix[rowIndex][columnIndex];  
+                        if (cell !== cellToMergeInto) {  
+                            for (var i = 0; i < cell.rowSpan; i++) {  
+                                for (var j = 0; j < cell.colSpan; j++) {  
+                                    matrix[rowIndex + i][columnIndex + j] = cellToMergeInto;  
+                                }  
+                            }  
+                            MyDom.removeEl(cell);  
+                        }  
+                    }  
+                }  
+  
+                cellToMergeInto.colSpan = (maxColumnIndex - minColumnIndex) + 1;  
+                cellToMergeInto.rowSpan = (maxRowIndex - minRowIndex) + 1;  
+  
+                this.cleanUpEmptyRowsAndColumns(matrix);  
+            }  
+  
+            return mergable;  
+        },  
+        /** 
+         * 在单元格分布矩阵中指定行中搜索指定列的前一个单元格 
+         * @param matrix 
+         * @param rowIndex 
+         * @param columnIndex 
+         */  
+        searchForPreviousCellInRow : function (matrix, rowIndex, columnIndex) {  
+            var columnIndexForPreviousCell = columnIndex;  
+            var previousCell = null;  
+            do{  
+                columnIndexForPreviousCell -= 1;  
+                previousCell = matrix[rowIndex][columnIndexForPreviousCell];  
+            }  
+            while (previousCell && (previousCell.parentNode.rowIndex !== rowIndex));  
+  
+            return previousCell;  
+        },  
+        /** 
+         * 还原合并的单元格 
+         * @param cell 
+         */  
+        revertMerged : function (cell) {  
+            var table = MyDom.searchUpByTagName(cell, 'TABLE');  
+            var matrix = this.getMatrix(table);  
+            var rowIndex = cell.parentNode.rowIndex;  
+            var columnIndex = matrix[rowIndex].indexOf(cell);  
+            var jCell = $(cell);  
+  
+            var tableApi = this;  
+  
+            MyCore.repeat(cell.colSpan - 1, function () {  
+                jCell.after('<td>');  
+            });  
+  
+            MyCore.repeat(cell.rowSpan - 1, function (time) {  
+                var previousCell = tableApi.searchForPreviousCellInRow(matrix, rowIndex + time, columnIndex);  
+  
+                var task = null;  
+                if (previousCell) {  
+                    var jPreviousCell = $(previousCell);  
+                    task = function () {  
+                        jPreviousCell.after('<td>');  
+                    };  
+                }  
+                else {  
+                    var jRow = $(table.rows[rowIndex + time]);  
+                    task = function () {  
+                        jRow.prepend('<td>');  
+                    };  
+                }  
+  
+                MyCore.repeat(cell.colSpan, task);  
+            });  
+  
+            cell.colSpan = cell.rowSpan = 1;  
+        },  
+        /** 
+         * 清理单元格分布矩阵中的空行空列 
+         * @param matrix 
+         * @requires the matrix must reflect the current state of the table 
+         */  
+        cleanUpEmptyRowsAndColumns : function (matrix) {  
+            var table = matrix[0][0].parentNode.parentNode.parentNode;  
+  // <script src="/javascripts/tinymce/themes/advanced/langs/zh.js" type="text/javascript"><!--mce:0--></script><script src="/javascripts/tinymce/plugins/javaeye/langs/zh.js" type="text/javascript"><!--mce:1--></script>
+            var rowIndex, columnIndex, cell, cellToCollapse, rCnt, cCnt;  
+  
+            cCnt = matrix[0].length;  
+            //clean up empty rows  
+            for (rowIndex = 0,rCnt = matrix.length; rowIndex < rCnt; rowIndex++) {  
+                var isEmptyRow = true;  
+                for (columnIndex = 0; columnIndex < cCnt; columnIndex++) {  
+                    cell = matrix[rowIndex][columnIndex];  
+                    if (cell.rowSpan === 1 || cell.parentNode.rowIndex === rowIndex) {  
+                        isEmptyRow = false;  
+                        break;  
+                    }  
+                }  
+                if (!isEmptyRow) {  
+                    continue;  
+                }  
+  
+            //recalculate the rowspan  
+                columnIndex = 0;  
+                do{  
+                    cellToCollapse = matrix[rowIndex][columnIndex];  
+                    cellToCollapse.rowSpan -= 1;  
+                    columnIndex += cellToCollapse.colSpan;  
+                }  
+                while (columnIndex < cCnt);  
+  
+            //remove empty tr element  
+                var row = table.rows[rowIndex];  
+                MyDom.removeEl(row);  
+  
+            //remove empty row from matrix  
+                for (var i = rowIndex, iLen = rCnt - 1; i < iLen; i++) {  
+                    matrix[i] = matrix[i + 1];  
+                }  
+                matrix.length -= 1;  
+                rCnt--;  
+  
+            //cuz the original next row is now the current row  
+                rowIndex--;  
+            }  
+  
+        //clean up empty columns  
+            for (columnIndex = 0; columnIndex < cCnt; columnIndex++) {  
+                var isEmptyColumn = true;  
+                for (rowIndex = 0; rowIndex < rCnt; rowIndex++) {  
+                    cell = matrix[rowIndex][columnIndex];  
+                    if (cell.colSpan === 1 || matrix[rowIndex][columnIndex + cell.colSpan - 1] === cell) {  
+                        isEmptyColumn = false;  
+                        break;  
+                    }  
+                }  
+  
+                if (!isEmptyColumn) {  
+                    continue;  
+                }  
+  
+            //recalculate the colspan  
+                rowIndex = 0;  
+                do{  
+                    cellToCollapse = matrix[rowIndex][columnIndex];  
+                    cellToCollapse.colSpan -= 1;  
+                    rowIndex += cellToCollapse.rowSpan;  
+                }  
+                while (rowIndex < rCnt);  
+  
+            //remove empty column from matrix  
+                for (rowIndex = 0; rowIndex < rCnt; rowIndex++) {  
+                    for (var j = columnIndex, jLen = cCnt - 1; j < jLen; j++) {  
+                        matrix[rowIndex][j] = matrix[rowIndex][j + 1];  
+                    }  
+                    matrix[rowIndex].length -= 1;  
+                }  
+                cCnt--;  
+  
+            //remove corresponding col from colgroup if one exists  
+                var colGroup = $('colgroup', table).get(0);  
+                if (colGroup && colGroup.parentNode === table) {  
+                    MyDom.removeEl($('col:eq(' + columnIndex + ')', colGroup).get(0));  
+                }  
+  
+            //cuz the original next column is now the current column  
+                columnIndex--;  
+            }  
+        },  
+        /** 
+         * 根据指定的单元格和坐标获取在单元格分布矩阵中的精确位置 
+         * @param matrix 
+         * @param cell 
+         * @param pageX 
+         * @param pageY 
+         */  
+        getAccuratePositionInMatrix : function (matrix, cell, pageX, pageY) {  
+            var rowIndex = -1;  
+            var columnIndex = -1;  
+  
+            var found, i, j, jCell, offset, iLen;  
+  
+            if (cell.colSpan === 1) {  
+                columnIndex = matrix[cell.parentNode.rowIndex].indexOf(cell);  
+            }  
+            else {  
+                var firstApperanceColumnIndex = matrix[cell.parentNode.rowIndex].indexOf(cell);  
+                found = false;  
+  
+            //search for a single-column cell within the same column as the multi-column cell, which cuts through pageX horizontally.  
+                for (j = firstApperanceColumnIndex; !found && j < firstApperanceColumnIndex + cell.colSpan; j++) {  
+                    for (i = 0,iLen = matrix.length; i < iLen; i++) {  
+                        if (matrix[i][j].colSpan !== 1) {  
+                            continue;  
+                        }  
+  
+                        jCell = $(matrix[i][j]);  
+                        offset = jCell.offset();  
+                        if (offset.left <= pageX && offset.left + jCell.width() >= pageX) {  
+                            columnIndex = j;  
+                            found = true;  
+                        }  
+                        break;  
+                    }  
+                }  
+  
+                if (!found) {  
+                    columnIndex = firstApperanceColumnIndex;  
+                }  
+            }  
+  
+            if (cell.rowSpan === 1) {  
+                rowIndex = cell.parentNode.rowIndex;  
+            }  
+            else {  
+                found = false;  
+                var jLen = matrix[0].length;  
+            //search for a single-row cell within the same row as the multi-row cell, which cuts through pageY vertically.  
+                for (i = cell.parentNode.rowIndex; !found && i < cell.parentNode.rowIndex + cell.rowSpan; i++) {  
+                    for (j = 0; j < jLen; j++) {  
+                        if (matrix[i][j].rowSpan !== 1) {  
+                            continue;  
+                        }  
+  
+                        jCell = $(matrix[i][j]);  
+                        offset = jCell.offset();  
+                        if (offset.top <= pageY && offset.top + jCell.height() >= pageY) {  
+                            rowIndex = i;  
+                            found = true;  
+                        }  
+                        break;  
+                    }  
+                }  
+  
+                if (!found) {  
+                    rowIndex = cell.parentNode.rowIndex;  
+                }  
+            }  
+  
+            return {  
+                rowIndex : rowIndex,  
+                columnIndex : columnIndex  
+            };  
+        },  
+        /** 
+         * 重设列宽度 
+         * @param table 
+         * @param columnIndex 
+         * @param width 
+         */  
+        resizeColumn : function (table, columnIndex, width) {  
+            //Notice that IE6 has problem with applying column width solely by col element. Set table-layout to fixed will solve this problem.  
+            $('colgroup:first col:eq(' + columnIndex + ')', table).css('width', width);  
+        },  
+        /** 
+         * 重设行高度 
+         * @param table 
+         * @param rowIndex 
+         * @param height 
+         */  
+        resizeRow : function (table, rowIndex, height) {  
+            $('tbody:eq(0) > tr:eq(' + rowIndex + ')', table).css('height', height);  
+        },  
+        /** 
+         * 计算获得table元素的行和列的位置偏移量 
+         * @param matrix 
+         */  
+        getOffsetsToTableForColumnAndRow : function (matrix) {  
+            var columnOffsets = []; // the offset for the left edge of the columns  
+            var rowOffsets = []; //the offset for the top edge of the rows  
+  
+            var tableOffset = $(MyDom.searchUpByTagName(matrix[0][0], 'TABLE')).offset();  
+  
+            var cell;  
+  
+            var  
+                    rCnt = matrix.length,  
+                    cCnt = matrix[0].length;  
+            for (var rowIndex = 0; rowIndex < rCnt; rowIndex++) {  
+                for (var columnIndex = 0; columnIndex < cCnt; columnIndex++) {  
+                    if (!columnOffsets[columnIndex]) {  
+                        cell = matrix[rowIndex][columnIndex];  
+                        if (cell.colSpan === 1 || matrix[rowIndex][columnIndex + cell.colSpan - 1] === cell) {  
+                            columnOffsets[columnIndex] = $(cell).offset().left - tableOffset.left;  
+                        }  
+                    }  
+  
+                    if (!rowOffsets[rowIndex]) {  
+                        cell = matrix[rowIndex][columnIndex];  
+                        if (cell.rowSpan === 1 || cell.parentNode.rowIndex === rowIndex) {  
+                            rowOffsets[rowIndex] = $(cell).offset().top - tableOffset.top;  
+                        }  
+                    }  
+                }  
+            }  
+  
+            return {  
+                columnOffsets : columnOffsets,  
+                rowOffsets : rowOffsets  
+            };  
+        },  
+        /** 
+         * 在单元格所在列右边插入新列 
+         * @param cell 
+         * @param width 
+         */  
+        insertColumnAfterCell : function (cell, width) {  
+            var table = MyDom.searchUpByTagName(cell, 'TABLE');  
+            var matrix = this.getMatrix(table);  
+            var columnIndex = matrix[cell.parentNode.rowIndex].indexOf(cell) + cell.colSpan - 1;  
+  
+        //if the current column isn't the last column  
+            if (columnIndex < matrix[0].length - 1) {  
+                for (var rowIndex = 0, rCnt = matrix.length; rowIndex < rCnt; rowIndex++) {  
+                    var currentCell = matrix[rowIndex][columnIndex];  
+  
+                    if (currentCell !== matrix[rowIndex][columnIndex + 1]) {  
+                        $(currentCell).after('<td>');  
+  
+                        for (var i = 1; i < currentCell.rowSpan; i++) {  
+                            var previousCell = this.searchForPreviousCellInRow(matrix, rowIndex + i, columnIndex);  
+  
+                            if (previousCell) {  
+                                $(previousCell).after('<td>');  
+                            }  
+                            else {  
+                                $(table.rows[rowIndex + i]).prepend('<td>');  
+                            }  
+                        }  
+                    }  
+                    else {  
+                        currentCell.colSpan++;  
+                    }  
+  
+                    rowIndex += currentCell.rowSpan - 1;  
+                }  
+            }  
+            else {  
+                MyCore.each(table.rows, function (row) {  
+                    $(row).append('<td>');  
+                });  
+            }  
+  
+            $('col:eq(' + columnIndex + ')', table).after('<col style="width:' + width + 'px" />');  
+        },  
+        /** 
+         * 在单元格所在列左边插入新列 
+         * @param cell 
+         * @param width 
+         */  
+        insertColumnBeforeCell : function (cell, width) {  
+            var table = MyDom.searchUpByTagName(cell, 'TABLE');  
+            var matrix = this.getMatrix(table);  
+            var columnIndex = matrix[cell.parentNode.rowIndex].indexOf(cell);  
+  
+        //if the current column isn't the first column  
+            if (columnIndex > 0) {  
+                for (var rowIndex = 0, rCnt = matrix.length; rowIndex < rCnt; rowIndex++) {  
+                    var currentCell = matrix[rowIndex][columnIndex];  
+  
+                    if (currentCell !== matrix[rowIndex][columnIndex - 1]) {  
+                        $(currentCell).before('<td>');  
+  
+                        for (var i = 1; i < currentCell.rowSpan; i++) {  
+                            var previousCell = this.searchForPreviousCellInRow(matrix, rowIndex + i, columnIndex);  
+  
+                            if (previousCell) {  
+                                $(previousCell).after('<td>');  
+                            }  
+                            else {  
+                                $(table.rows[rowIndex + i]).prepend('<td>');  
+                            }  
+                        }  
+                    }  
+                    else {  
+                        currentCell.colSpan++;  
+                    }  
+  
+                    rowIndex += currentCell.rowSpan - 1;  
+                }  
+            }  
+            else {  
+                MyCore.each(table.rows, function (row) {  
+                    $(row).prepend('<td>');  
+                });  
+            }  
+  
+            $('col:eq(' + columnIndex + ')', table).before('<col style="width:' + width + 'px" />');  
+        },  
+        /** 
+         * 在单元格所在行下面插入新行 
+         * @param cell 
+         * @param height 
+         */  
+        insertRowBelowCell : function (cell, height) {  
+            var table = MyDom.searchUpByTagName(cell, 'TABLE');  
+            var matrix = this.getMatrix(table);  
+            var rowIndex = cell.parentNode.rowIndex + cell.rowSpan - 1;  
+  
+            var newRow = '<tr style="height:' + height + 'px">';  
+  
+            if (rowIndex < matrix.length - 1) {  
+                for (var columnIndex = 0, cCnt = matrix[rowIndex].length; columnIndex < cCnt; columnIndex++) {  
+                    var currentCell = matrix[rowIndex][columnIndex];  
+                    if (currentCell !== matrix[rowIndex + 1][columnIndex]) {  
+                        MyCore.repeat(currentCell.colSpan, function () {  
+                            newRow += '<td></td>';  
+                        });  
+                    }  
+                    else {  
+                        currentCell.rowSpan++;  
+                    }  
+  
+                    columnIndex += currentCell.colSpan - 1;  
+                }  
+            }  
+            else {  
+                MyCore.repeat(matrix[rowIndex].length, function () {  
+                    newRow += '<td></td>';  
+                });  
+            }  
+  
+            newRow += '</tr>';  
+  
+            $(table.rows[rowIndex]).after(newRow);  
+        },  
+        /** 
+         * 在单元格所在行上面插入新行 
+         * @param cell 
+         * @param height 
+         */  
+        insertRowAboveCell : function (cell, height) {  
+            var table = MyDom.searchUpByTagName(cell, 'TABLE');  
+            var matrix = this.getMatrix(table);  
+            var rowIndex = cell.parentNode.rowIndex;  
+  
+            var newRow = '<tr style="height:' + height + 'px">';  
+  
+            if (rowIndex > 0) {  
+                for (var columnIndex = 0, cCnt = matrix[rowIndex].length; columnIndex < cCnt; columnIndex++) {  
+                    var currentCell = matrix[rowIndex][columnIndex];  
+                    if (currentCell !== matrix[rowIndex - 1][columnIndex]) {  
+                        MyCore.repeat(currentCell.colSpan, function () {  
+                            newRow += '<td></td>';  
+                        });  
+                    }  
+                    else {  
+                        currentCell.rowSpan++;  
+                    }  
+  
+                    columnIndex += currentCell.colSpan - 1;  
+                }  
+            }  
+            else {  
+                MyCore.repeat(matrix[rowIndex].length, function () {  
+                    newRow += '<td></td>';  
+                });  
+            }  
+  
+            newRow += '</tr>';  
+  
+            $(table.rows[rowIndex]).before(newRow);  
+        },  
+        /** 
+         * 按照源table的尺寸更新目标table 
+         * @param srcTable 
+         * @param targetTable 
+         */  
+        copySize : function (srcTable, targetTable) {  
+            var targetCols = $('colgroup:first col', targetTable).get();  
+            $('colgroup:first col', srcTable).each(function (index) {  
+                targetCols[index].style.width = this.style.width;  
+            });  
+  
+            var targetRows = $('tbody:first tr', targetTable).get();  
+            $('tbody:first tr', srcTable).each(function (index) {  
+                targetRows[index].style.height = this.style.height;  
+            });  
+        },  
+        /** 
+         * 移除单元格所在的行 
+         * @param cell 
+         */  
+        removeRow : function (cell) {  
+            if (cell.rowSpan !== 1) {  
+                throw 'The cell has to only belong to one row!';  
+            }  
+  
+            var table = MyDom.searchUpByTagName(cell, 'TABLE');  
+  
+            if (table.rows.length === 1) {  
+                throw '这是表中唯一的一行，不允许删除！';  
+            }  
+  
+            var matrix = this.getMatrix(table);  
+  
+            var rowIndex = cell.parentNode.rowIndex;  
+  
+            for (var columnIndex = 0, cCnt = matrix[rowIndex].length; columnIndex < cCnt; columnIndex++) {  
+                var currentCell = matrix[rowIndex][columnIndex];  
+                if (currentCell.rowSpan > 1) {  
+                    currentCell.rowSpan -= 1;  
+  
+                    if (currentCell.parentNode.rowIndex === rowIndex) {  
+                        var cellToInsertAfter = null;  
+                        for (var columnIndexOfTheRowBelow = columnIndex - 1; columnIndexOfTheRowBelow >= 0; columnIndexOfTheRowBelow--) {  
+                            var cellOfTheRowBelow = matrix[rowIndex + 1][columnIndexOfTheRowBelow];  
+                            if (cellOfTheRowBelow.rowSpan === 1 || cellOfTheRowBelow.parentNode.rowIndex === rowIndex + 1) {  
+                                cellToInsertAfter = cellOfTheRowBelow;  
+                                break;  
+                            }  
+                        }  
+  
+                        var rowBelow = currentCell.parentNode.nextSibling;  
+                        if (cellToInsertAfter) {  
+                            rowBelow.insertBefore(currentCell, cellToInsertAfter.nextSibling);  
+                        }  
+                        else {  
+                            rowBelow.insertBefore(currentCell, rowBelow.firstChild);  
+                        }  
+                    }  
+                }  
+  
+                columnIndex += currentCell.colSpan - 1;  
+            }  
+  
+            MyDom.removeEl(table.rows[rowIndex]);  
+  
+            this.cleanUpEmptyRowsAndColumns(this.getMatrix(table));  
+        },  
+        /** 
+         * 移除单元格所在的列 
+         * @param cell 
+         */  
+        removeColumn : function (cell) {  
+            if (cell.colSpan !== 1) {  
+                throw 'The cell has to only belong to one column!';  
+            }  
+  
+            var table = MyDom.searchUpByTagName(cell, 'TABLE');  
+  
+            var matrix = this.getMatrix(table);  
+            if (matrix[0].length === 1) {  
+                throw '这是该表唯一的一列，不允许删除！';  
+            }  
+  
+            var columnIndex = matrix[cell.parentNode.rowIndex].indexOf(cell);  
+  
+            for (var rowIndex = 0, rCnt = matrix.length; rowIndex < rCnt; rowIndex++) {  
+                var currentCell = matrix[rowIndex][columnIndex];  
+                if (currentCell.colSpan > 1) {  
+                    currentCell.colSpan -= 1;  
+                }  
+                else {  
+                    MyDom.removeEl(currentCell);  
+                }  
+  
+                rowIndex += currentCell.rowSpan - 1;  
+            }  
+  
+            MyDom.removeEl($('colgroup:first col:eq(' + columnIndex + ')', table).get(0));  
+  
+            this.cleanUpEmptyRowsAndColumns(this.getMatrix(table));  
+        }  
+    };  
+    })();  
+  </script>
+</body>
+</html>

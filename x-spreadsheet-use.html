@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -16,10 +15,49 @@
       table {
         width: 80%;
       }
+      #myTable {
+        display: none;
+      }
+      .x-spreadsheet-scrollbar {
+        opacity: 1;
+      }
+      #table_container {
+        margin-top: 10px;
+      }
     </style>
   </head>
   <body>
-    <!-- <button id="btn_senior_edit">高级编辑</button> -->
+    <table id="myTable" class="myTable" border="1">
+      <tr>
+        <td>cell</td>
+        <td rowspan="2">cell 4</td>
+        <td rowspan="2">cell 4</td>
+        <td rowspan="2">cell 4</td>
+        <td>cell</td>
+      </tr>
+      <tr>
+        <td>cell</td>
+        <td>cell</td>
+      </tr>
+    </table>
+
+    <!-- <table id="myTable" class="myTable" border="1">
+      <tr>
+        <td>cell</td>
+        <td>cell</td>
+        <td rowspan="2" colspan="2">cell 4</td>
+      </tr>
+      <tr>
+        <td>cell</td>
+        <td>cell</td>
+      </tr>
+      <tr>
+        <td>cell</td>
+        <td>cell</td>
+        <td>cell</td>
+        <td>cell</td>
+      </tr>
+    </table> -->
 
     <!-- <table id="myTable" class="myTable" border="1">
       <tr>
@@ -39,13 +77,7 @@
       </tr>
     </table> -->
 
-    <table
-      id="targetTable"
-      border="1"
-      width="100%"
-      cellpadding="0"
-      cellspacing="0"
-    >
+    <!-- <table id="myTable" border="1" width="100%" cellpadding="0" cellspacing="0">
       <tbody>
         <tr>
           <td rowspan="7">单位名称单位名称单位名称单位名称单位名称</td>
@@ -91,60 +123,52 @@
         </tr>
       </tbody>
       <tbody></tbody>
-    </table>
-    <button id="btn_to_json">导入到excel</button>
+    </table> -->
+
+    <!-- <button id="btn_to_json"></button> -->
+    <h3>转换成excel如下：</h3>
 
     <div id="xspreadsheet" class="xspreadsheet"></div>
     <button id="btn_save_table">保存</button>
     <div id="table_container"></div>
-    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.slim.min.js"></script>
     <script src="https://unpkg.com/x-data-spreadsheet@1.0.13/dist/xspreadsheet.js"></script>
     <script src="https://unpkg.com/x-data-spreadsheet@1.0.13/dist/locale/zh-cn.js"></script>
     <script>
       var charStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      var excel = null;
       // 表格的最新数据
       var latestData = {};
+      // 表格最大行下标
+      var maxRowIdx = -1;
+      // 表格最大列下标
+      var maxColIdx = -1;
 
-      // 表格最大列的下标
-      var maxColIdx = 0;
       (function() {
         init();
 
-        $("#btn_to_json").on("click", function() {
-          getDataFromTable("#targetTable");
-        });
+        // $("#btn_to_json").on("click", function() {
+        //   init();
+        // });
 
         $("#btn_save_table").on("click", function() {
           saveTable();
         });
       })();
 
+      /* ----------------------------- table转excel ----------------------------- */
       /* 初始化，用table生成excel */
       function init() {
         var options = getExcelOptions();
-        var data = getDataFromTable("#targetTable");
+        var data = getDataFromTable("#myTable");
+        console.log(data);
+
+        // mock数据
+        // var data = getExcelDefaultData3();
         createExcel(options, data);
       }
 
-      /**创建excel
-       * @param {string}   options 配置选项
-       * @param {string}   defaultData 表格初始数据
-       * @returns {string[]}
-       */
-      function createExcel(options, defaultData) {
-        // 覆盖默认配置选项
-        // x.spreadsheet.locale("zh-cn");
-        var excel = x.spreadsheet("#xspreadsheet", options);
-        excel.loadData(defaultData).change(newData => {
-          latestData = newData;
-          console.log(JSON.stringify(newData));
-          // console.log(newData);
-        });
-
-        // excel.locale("zh-cn");
-      }
-
-      /**TODO:从table获取excel数据
+      /**从table获取excel数据
        * @param {dom}  tableNode table对象
        * @returns {Object} data数据
        */
@@ -168,7 +192,7 @@
           // 当前行，当前单元格的下标
           var currCellIdx = 0;
           for (var j = 0; j < tds.length; j++) {
-            // 计算当前行前面的行中，影响当前单元格的 单元格 的cellIdx+colspan
+            // 计算当前行前面的行中，影响当前单元格的 单元格的cellIdx+colspan
             // 确定查找范围
             currCellIdx = getCellIdx(rows, i, prevCellIdx);
 
@@ -196,13 +220,16 @@
 
         jsonData.rows = rows;
         jsonData.merges = merges;
+
         return jsonData;
 
         // return getExcelDefaultData4();
       }
 
-      /**获取单元格的index
-       *
+      /**获取table的td转为excel单元格的index
+       * @param {Map}  rows 当前已计算出的行数据
+       * @param {Number} targetRowIdx 目标行下标
+       * @param {Number} startCellIdx 从当前行的哪个index开始
        */
       function getCellIdx(rows, targetRowIdx, startCellIdx) {
         var _cIdx = startCellIdx;
@@ -214,7 +241,7 @@
           // 如果当前循环的行超出范围
           if (rIdx >= targetRowIdx) break;
 
-          // 否则，查找某行中影响当前单元格下标的单元格
+          // 否则，查找之前的行中影响当前单元格下标的单元格
           var cells = rows[rIdx].cells;
           for (var cIdx in cells) {
             // 跳过前面已经查找过的单元格
@@ -237,18 +264,273 @@
             if (rowRange > targetRowIdx) {
               // 继续往后继的单元格找
               _cIdx = +colspan + +cIdx;
+              startCellIdx = _cIdx;
               continue;
             }
 
             // 否则，不包含的话
             //  如果已经是当前行的上一行了，就不必再找后面的了
             if (rIdx == targetRowIdx - 1) break row_loop;
+
             //  否则，继续往下一行同一位置开始找
             startCellIdx = cIdx;
             break;
           }
         }
         return _cIdx;
+      }
+
+      /**创建excel
+       * @param {string}   options 配置选项
+       * @param {string}   defaultData 表格初始数据
+       * @returns {string[]}
+       */
+      function createExcel(options, defaultData) {
+        // 覆盖默认配置选项
+        // x.spreadsheet.locale("zh-cn");
+        excel = x.spreadsheet("#xspreadsheet", options);
+        excel.loadData(defaultData).change(newData => {
+          latestData = newData;
+          console.log(JSON.stringify(newData));
+        });
+
+        // excel.locale("zh-cn");
+      }
+
+      /* ----------------------------- excel转table ----------------------------- */
+      /* 将excel保存转换为table */
+      function saveTable() {
+        latestData = excel.getData();
+        console.log(latestData);
+
+        // mock数据
+        // latestData = getExcelDefaultData4();
+        ctTableFromData(latestData);
+      }
+
+      /**根据数据创建table节点
+       * @param {Object}   data数据
+       * @returns {dom} 表格节点
+       */
+      function ctTableFromData(data) {
+        var node;
+        var rows = data.rows;
+        maxColIdx = getExcelMaxColIdx(rows);
+
+        var tableStr =
+          '<table border="1" width="100%" cellpadding="0" cellspacing="0"><tbody>';
+
+        for (var rIdx in rows) {
+          var cells = rows[rIdx].cells;
+          // 如果是空cells，说明可能是上一行有rowspan属性，跳过
+          if (isObjEmpty(cells)) continue;
+          // 生成一整行
+          var tableRowStr = ctTableRowStr(rows, rIdx, cells);
+          tableStr += tableRowStr;
+        }
+        tableStr += "<tbody></table>";
+        $("#table_container").html(tableStr);
+      }
+
+      /**TODO:获取excel的总列数
+       * @param {dom}   tableNode table对象
+       * @returns {Number}
+       */
+      function getExcelMaxColIdx(rows) {
+        var maxColIdx = 0;
+
+        // TODO:可能空行缺少判断
+        // TODO:只要编辑的单元格，即使没有值，也会占一个空的位置，因此会生成很多空列？？？
+        // 取得每行cells的最后（也是最大）key值
+        for (var rIdx in rows) {
+          if (rows.hasOwnProperty(rIdx)) {
+            var cells = rows[rIdx].cells;
+            var keys = Object.keys(cells);
+            // 如果是空cells，说明可能是上一行有rowspan属性
+            if (isArrEmpty(keys)) continue;
+            var lastRowIdx = keys[keys.length - 1];
+            var cell = cells[lastRowIdx];
+            // 防止用户编辑过的单元格，内容删掉了，但是cell={}/{text:""}，生成不必要的列
+            if (cell.text && lastRowIdx > maxColIdx) {
+              // 如果该单元格有合并列的情况，要加上colspan
+              var colspan = 0;
+              var mergeArr = cell.merge;
+              if (mergeArr instanceof Array) {
+                colspan = mergeArr[1];
+              }
+
+              maxColIdx = parseInt(lastRowIdx) + colspan;
+            }
+          }
+        }
+        console.log("最大列下标：" + maxColIdx);
+        return maxColIdx;
+      }
+
+      /* 生成表格的一行 */
+      function ctTableRowStr(rows, rIdx, cells) {
+        var tableRowStr = "<tr>";
+
+        // 单元格预期的index值（由上一个单元格算出）
+        var expectedCellIdx = 0;
+
+        // 常规生成行td
+        for (var cIdx in cells) {
+          // 不能超过最大列号
+          if (cIdx > maxColIdx) break;
+
+          // 当前cell下标和上一个下标如果不连续，则需获取缺失的单元格，防止后面的td位置前移
+          if (expectedCellIdx !== cIdx) {
+            var rowMissTds = getRowMissTdsBetweenCells(
+              rows,
+              rIdx,
+              expectedCellIdx,
+              cIdx
+            );
+            tableRowStr += rowMissTds;
+          }
+
+          // 2.处理跨行跨列
+          var cell = cells[cIdx];
+          var rowspanStr = "";
+          var colspanStr = "";
+          var rowspan = 1;
+          var colspan = 1;
+          if (cell.merge instanceof Array) {
+            // 因为跨格数是从0开始算起的，所以合并的格数要 +1
+            rowspan += cell.merge[0];
+            colspan += cell.merge[1];
+            if (rowspan > 1) rowspanStr += ` rowspan=${rowspan}`;
+            if (colspan > 1) colspanStr += ` colspan=${colspan}`;
+          }
+
+          tableRowStr += `<td${rowspanStr}${colspanStr}>${cell.text ||
+            " "}</td>`;
+          expectedCellIdx = +cIdx + +rowspan;
+        }
+
+        // 3.本行末，根据最大列补齐单元格
+        var missTdCount = getRowEndMissTdsCount(rIdx, cells);
+        for (var i = 0; i < missTdCount; i++) {
+          tableRowStr += `<td> </td>`;
+        }
+
+        tableRowStr += "</tr>";
+        return tableRowStr;
+      }
+
+      /**判断两个单元格之间确实的单元格数，需要补充回去
+       * @param {Map}  rows 整个单元格数据
+       * @param {Number}  rIdx 当前行下标
+       * @param {Number}  expectedCellIdx 当前行当前cell的预期index
+       * @param {Number}  currCellIdx 当前行当前cell的index
+       */
+      function getRowMissTdsBetweenCells(
+        rows,
+        rIdx,
+        expectedCellIdx,
+        currCellIdx
+      ) {
+        var missTdCount = 0;
+        var rowMissTds = "";
+        // 查找指定下标范围，缺失的单元格情况
+        var merges = row.merges;
+        var 
+        for (var i = 0; i < merges.length; i++) {
+          const merge = merges[i];
+        }
+
+        for (var i = 0; i < missTdCount; i++) {
+          rowMissTds += `<td> </td>`;
+        }
+        return rowMissTds;
+      }
+
+      /**计算某行行尾缺少的单元格个数，需要补充回去
+       * @param {Number} targetRowIdx 目标行下标
+       * @param {Map}  cells 目标行单元格数据
+       */
+      function getRowEndMissTdsCount(targetRowIdx, cells) {
+        // 记录缺失的单元格数量
+        var count = 0;
+
+        // 记录当前行已有的单元格数量
+        var keys = Object.keys(cells);
+
+        // 不缺单元格
+        if (isArrEmpty(keys)) return count;
+
+        var rowLastCellIdx = keys[keys.length - 1];
+        var cell = cells[rowLastCellIdx];
+        var tdCount = +rowLastCellIdx + (cell.merge ? cell.merge[1] + 1 : 1);
+
+        var rows = latestData.rows;
+
+        // 从第一行向当前行，寻找影响当前行单元格个数的cell
+        for (var rIdx in rows) {
+          if (rIdx >= targetRowIdx) break;
+
+          var cells = rows[rIdx].cells;
+          for (var cIdx in cells) {
+            var cell = cells[cIdx];
+
+            var rowspan = 1;
+            var colspan = 1;
+            if (cell.merge instanceof Array) {
+              rowspan += cell.merge[0];
+              colspan += cell.merge[1];
+            }
+            // 通过rowspan计算单元格的作用范围
+            var rowRange = +rIdx + rowspan;
+
+            // 如果在作用范围内，且单元格下标>当前行最后一个单元格的下标
+            if (targetRowIdx < rowRange && rowLastCellIdx < cIdx) {
+              tdCount += colspan;
+            }
+          }
+        }
+        count = maxColIdx + 1 - tdCount;
+        return count;
+      }
+
+      /* ----------------------------- others ----------------------------- */
+      /**获取excel插件的配置选项
+       * @returns {Object} 数据
+       */
+      function getExcelOptions() {
+        return {
+          showToolbar: true,
+          showContextmenu: true,
+          view: {
+            height: () => 300,
+            width: () => 800
+          },
+          row: {
+            len: 100,
+            height: 25
+          },
+          col: {
+            len: 26,
+            width: 100,
+            indexWidth: 60,
+            minWidth: 60
+          },
+          style: {
+            bgcolor: "#ffffff",
+            align: "left",
+            valign: "middle",
+            textwrap: false,
+            strike: false,
+            underline: false,
+            color: "#0a0a0a",
+            font: {
+              name: "Helvetica",
+              size: 10,
+              bold: false,
+              italic: false
+            }
+          }
+        };
       }
 
       /**获取excel插件的初始化数据
@@ -506,198 +788,6 @@
           cols: {},
           validations: []
         };
-      }
-
-      /**获取excel插件的配置选项
-       * @returns {Object} 数据
-       */
-      function getExcelOptions() {
-        return {
-          showToolbar: true,
-          showContextmenu: true,
-          view: {
-            height: () => 300,
-            width: () => 800
-          },
-          row: {
-            len: 100,
-            height: 25
-          },
-          col: {
-            len: 26,
-            width: 100,
-            indexWidth: 60,
-            minWidth: 60
-          },
-          style: {
-            bgcolor: "#ffffff",
-            align: "left",
-            valign: "middle",
-            textwrap: false,
-            strike: false,
-            underline: false,
-            color: "#0a0a0a",
-            font: {
-              name: "Helvetica",
-              size: 10,
-              bold: false,
-              italic: false
-            }
-          }
-        };
-      }
-
-      /* 保存table */
-      function saveTable() {
-        // TODO:可能缺少判断空table的情况
-        // mock数据
-        latestData = isObjEmpty(latestData)
-          ? getExcelDefaultData4()
-          : latestData;
-        ctTableFromData(latestData);
-      }
-
-      /**根据数据创建table节点
-       * @param {Object}   data数据
-       * @returns {dom} 表格节点
-       */
-      function ctTableFromData(data) {
-        var node;
-        var rows = data.rows;
-        maxColIdx = getExcelMaxColIdx(rows);
-        console.log("最大列下标：" + maxColIdx);
-
-        var tableStr =
-          '<table border="1" width="100%" cellpadding="0" cellspacing="0"><tbody>';
-
-        for (var rIdx in rows) {
-          var cells = rows[rIdx].cells;
-          // 如果是空cells，说明可能是上一行有rowspan属性，跳过
-          if (isObjEmpty(cells)) continue;
-          // 生成一整行
-          var tableRowStr = ctTableRowStr(rIdx, cells);
-          tableStr += tableRowStr;
-        }
-        tableStr += "<tbody></table>";
-        $("#table_container").html(tableStr);
-      }
-
-      /* 生成表格的一行 */
-      function ctTableRowStr(rIdx, cells) {
-        var tableRowStr = "<tr>";
-
-        for (var cIdx in cells) {
-          // 不能超过最大列号
-          if (cIdx > maxColIdx) break;
-
-          var cell = cells[cIdx];
-
-          // 判断有无单元格合并的情况
-          var rowspanStr = "";
-          var colspanStr = "";
-          var rowspan = 1;
-          var colspan = 1;
-          if (cell.merge instanceof Array) {
-            // 因为跨格数是从0开始算起的，所以合并的格数要 +1
-            rowspan += cell.merge[0];
-            colspan += cell.merge[1];
-            if (rowspan > 1) rowspanStr += ` rowspan=${rowspan}`;
-            if (colspan > 1) colspanStr += ` colspan=${colspan}`;
-          }
-
-          tableRowStr += `<td${rowspanStr}${colspanStr}>${cell.text ||
-            " "}</td>`;
-        }
-
-        // 单元格补齐
-        var missTdCount = getRowMissTdCount(rIdx, cells);
-        for (var i = 0; i < missTdCount; i++) {
-          tableRowStr += `<td> </td>`;
-        }
-
-        tableRowStr += "</tr>";
-        return tableRowStr;
-      }
-
-      /**计算某行缺少的单元格个数
-       * @param {Number}   targetRowIdx 目标行下标
-       * @param {map}  cells 目标行单元格数据
-       */
-      function getRowMissTdCount(targetRowIdx, cells) {
-        // 记录缺失的单元格数量
-        var count = 0;
-
-        // 记录当前行已有的单元格数量
-        var keys = Object.keys(cells);
-
-        // 不缺单元格
-        if (isArrEmpty(keys)) return count;
-
-        var rowLastCellIdx = keys[keys.length - 1];
-        var cell = cells[rowLastCellIdx];
-        var tdCount = +rowLastCellIdx + (cell.merge ? cell.merge[1] + 1 : 1);
-
-        var rows = latestData.rows;
-
-        // 从第一行向当前行，寻找影响当前行单元格个数的cell
-        for (var rIdx in rows) {
-          if (rIdx >= targetRowIdx) break;
-
-          var cells = rows[rIdx].cells;
-          for (var cIdx in cells) {
-            var cell = cells[cIdx];
-
-            var rowspan = 1;
-            var colspan = 1;
-            if (cell.merge instanceof Array) {
-              rowspan += cell.merge[0];
-              colspan += cell.merge[1];
-            }
-            // 通过rowspan计算单元格的作用范围
-            var rowRange = +rIdx + rowspan;
-
-            // 如果在作用范围内，且单元格下标>当前行最后一个单元格的下标
-            if (targetRowIdx < rowRange && rowLastCellIdx < cIdx) {
-              tdCount += colspan;
-            }
-          }
-        }
-        count = maxColIdx + 1 - tdCount;
-        return count;
-      }
-
-      /**获取excel的列数
-       * @param {dom}   tableNode table对象
-       * @returns {Number}
-       */
-      function getExcelMaxColIdx(rows) {
-        var maxColIdx = 0;
-
-        // TODO:可能空行缺少判断
-        // TODO:只要编辑的单元格，即使没有值，也会占一个空的位置，因此会生成很多空列？？？
-        // 取得每行cells的最后（也是最大）key值
-        for (var rIdx in rows) {
-          if (rows.hasOwnProperty(rIdx)) {
-            var cells = rows[rIdx].cells;
-            var keys = Object.keys(cells);
-            // 如果是空cells，说明可能是上一行有rowspan属性
-            if (isArrEmpty(keys)) continue;
-            var lastRowIdx = keys[keys.length - 1];
-            var cell = cells[lastRowIdx];
-            // 防止用户编辑过的单元格，内容删掉了，但是cell={}/{text:""}，生成不必要的列
-            if (cell.text && lastRowIdx > maxColIdx) {
-              // 如果该单元格有合并列的情况，要加上colspan
-              var colspan = 0;
-              var mergeArr = cell.merge;
-              if (mergeArr instanceof Array) {
-                colspan = mergeArr[1];
-              }
-
-              maxColIdx = parseInt(lastRowIdx) + colspan;
-            }
-          }
-        }
-        return maxColIdx;
       }
 
       function isObjEmpty(obj) {
